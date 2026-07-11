@@ -7,7 +7,6 @@ if exist out rmdir /s /q out
 if exist dist rmdir /s /q dist
 mkdir out
 mkdir dist
-mkdir dist\lib
 
 echo === Compiling ===
 javac -encoding UTF-8 -cp "%CP%" -d out Main.java ModDownloaderFrame.java I18n.java Fonts.java Icons.java Modrinth.java ImageCache.java InstallManifest.java NativeFolderPicker.java BusyGlassPane.java FadingIcon.java ModHitTransferable.java AppDialog.java Toast.java Logger.java || exit /b 1
@@ -16,25 +15,23 @@ echo === Bundling fonts and theme into the classes ===
 xcopy /e /i /y resources out\resources >nul
 xcopy /e /i /y theme out\theme >nul
 
+echo === Merging dependency jars in (fat jar - no lib folder needed at runtime) ===
+pushd out
+for %%f in (..\lib\*.jar) do (
+  jar xf "%%f"
+)
+if exist META-INF\MANIFEST.MF del META-INF\MANIFEST.MF
+popd
+
 echo === Building modsoft.jar ===
 (
   echo Main-Class: Main
 ) > out\MANIFEST.MF
 jar cfm dist\modsoft.jar out\MANIFEST.MF -C out . || exit /b 1
 
-echo === Copying dependency jars ===
-copy /y lib\*.jar dist\lib\ >nul
-
-echo === Writing launcher ===
-(
-  echo @echo off
-  echo java -cp "modsoft.jar;lib\*" Main
-) > dist\run.bat
-
 echo.
-echo Done. Portable build is in the "dist" folder:
-echo   dist\modsoft.jar
-echo   dist\lib\*.jar
-echo   dist\run.bat  ^(double-click to launch^)
+echo Done. dist\modsoft.jar is a single self-contained file:
+echo   java -jar modsoft.jar
+echo   (or just double-click it - Java must be installed)
 echo.
-echo Zip the "dist" folder to upload it as a GitHub release asset.
+echo Zip dist\modsoft.jar to upload it as a GitHub release asset.

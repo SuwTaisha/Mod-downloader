@@ -31,10 +31,13 @@ Vietnamese/English).
 ## Using the app
 
 1. Download a release from the GitHub Releases page (see below for the two
-   variants) and extract the zip.
+   variants). Both are single files — no extraction or extra folders needed.
 2. Launch it:
-   - Native build: run `Modsoft.exe`.
-   - Portable build: run `run.bat` (or `java -cp "modsoft.jar;lib\*" Main`).
+   - **Native build**: run `Modsoft-<version>.exe`. This is an installer —
+     it installs the app (Start Menu shortcut, desktop shortcut) and needs
+     nothing else alongside it. No Java required.
+   - **Portable build**: double-click `modsoft.jar`, or run
+     `java -jar modsoft.jar`. Needs Java 17+ installed.
 3. Choose an install directory first (folder picker, or type/paste a path —
    `%appdata%`-style variables are expanded). Mod selection stays disabled
    until a directory is confirmed.
@@ -76,10 +79,15 @@ All classes live in the default package (no `src/` tree):
 | `BusyGlassPane.java` | Frame-wide "busy" overlay + spinner |
 | `Icons.java` / `Fonts.java` | Hand-drawn vector icons, bundled Inter font |
 | `Logger.java` | Appends to `logs/modsoft.log` |
+| `GenerateIcon.java` | One-off tool: resizes `icon.jpg` into `icon.ico` (multi-size, PNG-in-ICO) for the packaged app's icon |
 
 Resources (`resources/fonts/*.ttf`, `theme/*.properties`) are loaded off the
 classpath, so they work both when running from `out/` in development and
 once bundled inside the packaged jar.
+
+`run.bat` runs the app straight off `out/` with the vendored jars on the
+classpath (`-cp "out;.;lib\...`), which is convenient for development but
+**not** how the packaged release works — see below.
 
 ### Building and running from source
 
@@ -104,33 +112,49 @@ Two packaging scripts are provided; run them from the project root.
 package.bat
 ```
 
-Produces `dist/modsoft.jar`, `dist/lib/*.jar`, and `dist/run.bat`. Zip the
-`dist` folder — that's the release asset.
+Produces a single self-contained `dist/modsoft.jar` — it's a fat jar (our
+classes plus every dependency's classes merged in, per `jar xf` in the
+script), so `java -jar modsoft.jar` works with no separate `lib/` folder and
+no `-cp` needed. That single file is the release asset.
 
-**Native Windows app** (bundles its own Java runtime, nothing required on
-the user's machine):
+> Earlier builds shipped `modsoft.jar` next to a `lib/` folder with a
+> `run.bat` launcher, relying on a `Class-Path` manifest entry. That's what
+> caused the "opens and immediately disappears" bug: double-clicking a jar
+> (or `java -jar` without an explicit `-cp`) ignores everything except the
+> manifest, and the manifest didn't declare `lib/*.jar` — so it threw
+> `NoClassDefFoundError` with no console to show it. The fat-jar approach
+> above avoids the whole class of bug.
+
+**Native Windows installer** (single `.exe`, bundles its own Java runtime —
+nothing required on the user's machine):
 
 ```bat
 package.bat
 package-exe.bat
 ```
 
-Uses `jpackage` (bundled with the JDK since Java 14) to produce an
-app-image at `release-exe/Modsoft/Modsoft.exe`. Zip the `release-exe/Modsoft`
-folder — that's the release asset.
+Requires the [WiX Toolset v3](https://wixtoolset.org/) (`candle.exe` /
+`light.exe`) — install it once with:
 
-By default `package-exe.bat` keeps a console window behind the app (useful
-while testing — you'll see any startup errors). Drop the `--win-console`
-flag inside the script for a clean release build with no console window.
+```bat
+winget install --id WiXToolset.WiXToolset
+```
 
-> `jpackage --type msi`/`--type exe` (a proper installer) additionally
-> requires the [WiX Toolset](https://wixtoolset.org/) to be installed. The
-> app-image build above doesn't need it — it's just a folder you unzip and
-> run, which is the simpler option for a GitHub release.
+`package-exe.bat` adds WiX's default install location to `PATH` for its own
+run, so nothing else needs configuring. It calls `jpackage --type exe` with
+`--icon icon.ico`, producing a single installer at
+`release-exe/Modsoft-1.0.0.exe`. That one file is the release asset —
+running it installs the app (Start Menu + desktop shortcut, no console
+window) with nothing else needed alongside it.
+
+> An earlier iteration used `jpackage --type app-image`, which doesn't need
+> WiX but produces a *folder* (`.exe` plus `app/` and `runtime/` subfolders)
+> instead of one file — easy to accidentally split up when distributing.
+> The installer approach above avoids that.
 
 ### Publishing a GitHub release
 
 1. `package.bat && package-exe.bat`
-2. Zip `dist/` → e.g. `modsoft-portable-v1.0.0.zip`
-3. Zip `release-exe/Modsoft/` → e.g. `modsoft-windows-v1.0.0.zip`
-4. Create a new release on GitHub and attach both zips.
+2. Attach `dist/modsoft.jar` directly (already a single file)
+3. Attach `release-exe/Modsoft-1.0.0.exe` directly (already a single file)
+4. Create a new release on GitHub and attach both.
